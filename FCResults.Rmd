@@ -1,0 +1,116 @@
+---
+title: "FCresults"
+output: 
+  html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+```
+
+```{r, echo=FALSE, message = FALSE, warning = FALSE}
+library(ggplot2)
+library(kableExtra)
+library(tidyr)
+library(dplyr)
+```
+
+This document goes into results of the work on understanding results from the ILT Fuelcalculator (FC)
+Jasper van VLiet, 07/2018
+
+There are two data sources used in this exercise:
+
+1. Results from sampling as administrated by the PSC office (Inspecties2017Jeanette (11-01-2018).xlsx)
+2. All FC files that could be found on the O:\ drive with the search criteria: Rekenmeth_AnnVISulph
+
+### Inspectie gegevens over monstername en gebruik van FC
+
+Voor dit overzicht is gebruik gemaakt van resultaten van monsternames door onze inspecteurs. Als er geen SGS labo resultaten zijn, dan is gebruik gemaakt van XRF resultaten.
+
+Er zijn ongeveer 680 inspecties uitgevoerd, in 350 gevallen zijn er monsters genomen. In 67 van die gevallen is de Fuel calculator ook toegepast. Verder is de Fuel calculator 50 toegepast zonder dat er een monster is genomen.
+
+
+####Table 1
+```{r, echo=FALSE}
+
+InspectionData <- read.csv2("InspectionData.csv")
+InspectionData %>%
+  group_by (FCUsed, SampleTaken, SampleCompliant) %>%
+  summarise (n=n()) %>%
+  spread (SampleCompliant,n) %>%
+  kable() %>%
+  kable_styling() %>%
+  add_header_above(c(" " =1, " " =1, "Sample Compliant" =3))
+
+```
+
+
+### FC results, part 1
+
+Er zijn ongeveer 150 files gevonden op de O:\ schijf met in een gedeelte van de naam 'Reekenmeth_AnnVI'. Na verwijderen van gevallen waarbij niet genoeg data kan worden ingelezen of andere problemen blijven er 125 hiervan over. Dat is interessant want in de statistieken zoals bijgehouden in de inspectiegegevens zijn er 117 genoteerd. Ik weet niet waar het verschil door komt. Mogelijk FCs gebruikt voor uitleg en niet inspectie, gemiste registraties of andere oorzaken.
+
+De resultaten van de FCs zijn hieronder weergegeven. Op de horizontale as het brandstofverbruik zoals uit de logboeken is afgeleid, op de verticale as het berekende brandstofverbruik. De diagonale lijn geeft aan waar deze twee waardes gelijk zijn. Rode punten onder de lijn is een schip waarschijnlijk compliant, het heeft meer brandstofverbruik in de boeken dan berekend. Boven de lijn kan er wat aan de hand zijn, het brandstofgebruik is dan minder dan de (conservatieve berekening). Op welke brandstof heeft het schip dan gevaren? Bij blauwe punten (4 maal) is de afwijking <10%, bij groene punten(7) is deze afwijking groter.
+
+Conclusions:
+
+1. In 11 cases the Fuel calculator gives indication of non-compliance (blue and green markers).
+2. In 7 cases this deviation is more than 10% more fuel calculated than consumed.
+3. Even after cleaning there is quite some extreme results. some 30 cases calculated fuel use is less than half of fuel use in bunkers. (User challenges?)
+
+```{r, echo=FALSE, fig.cap="Figure 1: Calculated and logbook based Fuel consumption"}
+FCData <- read.csv2("FCData.csv")
+#create data for x=y line
+x <- seq(from = 0, to = 200, by = 50)
+y<- x
+d <- data.frame(x,y)
+
+ggplot() + 
+  geom_point(data = FCData, aes(AdminFuelUse,CalcFuelUse, color = ComplianceLevel)) +
+  geom_line(aes(x, y), d) 
+```
+
+### FC results, part 2
+
+Another way of looking at results is distribution of relative fuel use (calculated/derived from bunkers)
+Horizontal axis relative Fuel use. Values bigger than 1 means less fuel consumed in bunkers than calculated.
+Dashed line is average relative fuel use.
+
+Conclusions:
+
+1. Whether based on average or most common outcome, FC seems to underestimate fuel use with some 30-40%
+2. Surprising peak between values of 0.8 and 1.
+3. Given the bias (from 1) and the surprising frequency peak (2),  this deserves further discussion (preferably more and good check on data)
+
+```{r, echo = FALSE, fig.cap="Figure 2: Distribution of relative Fuel Use (Calculated/bunkerbased)"}
+ggplot(data = FCData, aes(x=relFuelUse)) +
+  geom_histogram(binwidth = 0.05, colour = "#FF6666", fill = "#FF6666", alpha = "0.5") +
+  geom_vline(aes(xintercept = mean(FCData$relFuelUse)), color = "#FF6666", linetype = "dashed", size = 1)
+```
+
+### Comparing results sampling and FC
+
+Graph below displays on horizontalaxis the FSC of samples. The vertical axis displays the relative FuelUse. This is the fraction of calculated Fuel use, divided by fuel use as taken from the logbooks. A value larger than 1 means that there is less fuel used in the logbooks than calculated from sailing times. In that case the ship may have used other (non-compliant) fuels to reacht port.
+
+Conclusions from this graph:
+
+1. Of 125 available FC results, there are 20 cases that can ben matched with a fuel sample. Expected number is 67, IMO numbers are regularly missing in FC. 105 cannot be matched with a fuel sample.
+2. In three cases the fuel sample is larger than 0.12%S, but the FC did not detect abnormal fuel use.
+3. Considering the bias as shown in figure 2, these results should be considered suspicious at least.
+4. In 1 case the FC detected abnormal fuel use, but the associated Fuel sample was <0.1% S.
+
+
+```{r, echo=FALSE, fig.cap="Figure 3: Comparing fuel sampling and FC results"}
+
+ggplot() +
+  geom_point(data = FCData, aes(FuelSample, relFuelUse, color =ComplianceLevel))
+```
+
+### General Conclusions
+
+These conclusions are based on the data that were read by computer. Manual extraction of data from FCs can help strengthen conclusions.
+
+1. Out of 150  FCs on O:\, only 20 can be matched with fuel samples at this moment. Mostly due to incomplete (IMO)data in FC
+2. Bias of the fuel calculator from FC results can be estimated at 30-40%.
+3. There are cases where fuel calculator finds results that indicate non-compliance. Now knowing the bias, there could very well be more.
+4. Some form of quality control could eliminate variability in current results.
